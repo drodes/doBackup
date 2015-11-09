@@ -1,0 +1,225 @@
+#! /bin/bash
+
+#set -o xtrace
+#set -o nounset
+
+##############################################################################
+# Name      : dobackup
+# Llicense  : The MIT License (MIT)
+# Goal      : Do directory backups, for example your home directory
+# Operation : At the beginning of each month is a full backup and every day of 
+#             the month is an incremental backup.
+#             The scrip verifies if exist the full backup of this month. 
+#             If there isn't, does the full backup, but if there is, does an 
+#             incremental backup since the last. Also create log files with a 
+#             list of the content of backup files.
+#             There is a exclusion file where you can establish all you will 
+#             not want to copy. 
+# Files     : The full backup name is 'year-month-0-hostname-full.tar.bz2'
+#             The incremental backup name is 'year-month-day-hostname-inc.tar.bz2'
+#             The logs files has the same name but ending with .log instead of 
+#             .tar.gz2
+#             There is a .snap file that maintains the list of files to be 
+#             copied to the incremental backups
+# Automation: To automate the backup, run this script from /etc/rc_local to make 
+#             the backup when the computer is power on
+# Usage     : ./backup &
+##############################################################################
+
+#CONFIGURATION CONSTANTS
+   v_backup_source=/home                                       #Source backup folder
+   v_backup_target=/media/disc_extern/backups/$(/bin/uname -n) #Target backup folder
+  v_exclusion_file=/root/backup/backup-exclusions.txt          #path and filename of exclusion file
+
+#Variables
+         V_VERSION="20151109"        #Version of this script 
+        v_hostname=$(/bin/uname -n)  #Hostname where the script runs
+      v_today_year=$(date +%Y)       #Year of today's date 
+     v_today_month=$(date +%m)       #Month of today's date
+       v_today_day=$(date +%d)       #Day of today's date
+        v_log_full=$v_backup_target/$v_today_year-$v_today_month-00-$v_hostname.log                    #The log of full backup filename
+         v_log_inc=$v_backup_target/$v_today_year-$v_today_month-$v_today_day-$v_hostname.log          #The log of incremental backup filename
+       v_snap_file=$v_backup_target/$v_today_year-$v_today_month-$v_hostname.snap                      #The .snap file that maintains the list of files to be copied to the incremental backups
+     v_backup_full=$v_backup_target/$v_today_year-$v_today_month-00-full-$v_hostname.tar.bz2           #The full backup filename
+      v_backup_inc=$v_backup_target/$v_today_year-$v_today_month-$v_today_day-inc-$v_hostname.tar.bz2  #The incremental backup filename
+    v_param_backup="-c -p -j -v -f"                                                                    #Tar parameters (Create,Preserve permissions,bz2 compression,Verbose,File)
+
+##############################################################################
+#
+# Annotate the timestamp and the message in the log file
+#
+##############################################################################
+f_log ()
+{
+   f_timestamp
+   echo "$v_timestamp#$1" >> $v_log_full
+}
+
+##############################################################################
+#
+# Create the timestamp
+#
+##############################################################################
+f_timestamp ()
+{
+   v_timestamp=$(date +%Y%m%d_%H%M%S)
+}
+
+##############################################################################
+#
+# Check if there is source directory of the backup
+# No  --> exit
+# yes --> cd
+#
+##############################################################################
+f_source_exist ()
+{
+   if [ ! -d $v_backup_source ]; then
+      f_log "Does not exist the source directory of the backup: $v_backup_source . Process aborted"
+      exit 1
+   else
+      cd $v_backup_source
+   fi
+}
+
+##############################################################################
+#
+# Check if there is target directory of the backup 
+# No --> Try to create
+#    No --> exit
+#
+##############################################################################
+f_target_exist ()
+{
+   if [ ! -d $v_backup_target ]; then
+      mkdir -p $v_backup_target
+      if [ "$?" -ne 0 ]
+      then
+         f_log "Can't create target directory of the backup: $v_backup_target . Process aborted"
+         exit 1
+      fi
+   fi
+}
+
+##############################################################################
+#
+# Check if there is the exclusion file of the backup 
+# No --> configure backup without exclusions
+# Si --> configure backup with exclusions
+#
+##############################################################################
+f_exclusion_exist ()
+{
+   if [ ! -f $v_exclusion_file ]; 
+   then
+      f_log "Does not exist the exclusion file: $v_exclusion_file"
+      v_exclusions=1
+   else
+      v_exclusions=0
+   fi
+}
+
+##############################################################################
+#
+# Check for the full backup of this month
+# No --> configure full backup 
+# Si --> configure incremental backup
+#
+##############################################################################
+f_full_inc ()
+{
+   if [ ! -f $v_backup_full ]
+   then
+      v_backup_file=$v_backup_full
+   elif [ ! -f $v_backup_inc ]
+   then
+      v_backup_file=$v_backup_inc
+   else
+      f_log "Today existing file backup: $v_backup_inc . Process aborted"
+      exit 2
+   fi
+}
+
+##############################################################################
+#
+# Performs the backup as has been configured
+# Adds the file list to the month full log file
+# Create the incremental log file, with the today file list
+#
+##############################################################################
+f_dobackup ()
+{
+   f_log "+++Starting backup+++"
+   f_log "---Source directory of the backup: $v_backup_source ---"
+   f_log "---Backup filename: $v_backup_file ---"
+   if [ $v_exclusions -eq 0 ]
+   then
+      f_log "---Exclusion file: $v_exclusion_file ---"
+      tar $v_param_backup $v_backup_file -X $v_exclusion_file -g $v_snap_file * | grep -v /$ | tee -a $v_log_full | tee $v_log_inc
+   else
+      tar $v_param_backup $v_backup_file -g $v_snap_file * | grep -v /$ | tee -a $v_log_full | tee $v_log_inc
+   fi
+   f_log "+++Ending backup+++"
+}
+##############################################################################
+#
+# Main
+#
+##############################################################################
+f_target_exist
+f_source_exist
+f_exclusion_exist
+f_full_inc
+f_dobackup
+
+##############################################################################
+## TAR parameters
+#  -A, --catenate, --concatenate
+#     append tar files to an archive
+#  -g, --listed-incremental FILE
+#    handle new GNU-format incremental backup
+#  --occurrence
+#    process only the NUMBERth occurrence of each file in the archive;
+#  -u, --update
+#     only append files newer than copy in archive
+#  -c, --create
+#     create a new archive
+#  -C, --directory DIR
+#     change to directory DIR
+#  --exclude=PATTERN
+#     exclude files, given as a PATTERN
+#  --exclude-backups
+#     exclude backup and lock files
+#  --exclude-caches-all
+#     exclude directories containing CACHEDIR.TAG
+#  -f, --file ARCHIVE
+#     use archive file or device ARCHIVE
+#  --index-file=FILE
+#     send verbose output to FILE
+#  -j, --bzip2 (.bz2)
+#  -k, --keep-old-files
+#     don't replace existing files when extracting
+#  --overwrite
+#     overwrite existing files when extracting
+#  --level=NUMBER
+#     dump level for created listed-incremental archive
+#  -p, --preserve-permissions, --same-permissions
+#     extract information about file permissions (default for superuser)
+#  --show-defaults
+#     show tar defaults
+#  -T, --files-from FILE
+#     get names to extract or create from FILE
+#  --totals
+#     print total bytes after processing the archive;
+#  -v, --verbose
+#     verbosely list files processed
+#  -W, --verify
+#     attempt to verify the archive after writing it
+#  -X, --exclude-from FILE
+#     exclude patterns listed in FILE
+#  tar --show-defaults
+#     --format=gnu -f- -b20 --quoting-style=escape --rmt-command=/usr/lib/tar/rmt --rsh-command=/usr/bin/rsh
+#The first argument to tar should be a function; either one of the letters Acdrtux, or one of the long function names. A function letter need not be prefixed with ``-'', and may be combined with other single-letter options.  A long function name must be prefixed with --. Some options take a parameter; with the single-letter form these must be given as separate arguments.  With the long form, they may be given by appending =value to the option.
+#
+
+
