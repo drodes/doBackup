@@ -1,0 +1,13 @@
+Name      : dobackup
+Llicense  : The MIT License (MIT)
+Goal      : Do directory backups, for example your home directory
+Operation : At the beginning of each month is a full backup and every day of the month is an incremental backup.
+            The scrip verifies if exist the full backup of this month. 
+            If there isn't, does the full backup, but if there is, does an incremental backup since the last. Also create log files with a list of the content of backup files.
+            There is a exclusion file where you can establish all you will not want to copy. 
+Files     : The full backup name is 'year-month-0-hostname-full.tar.bz2'
+            The incremental backup name is 'year-month-day-hostname-inc.tar.bz2'
+            The logs files has the same name but ending with .log instead of .tar.gz2
+            There is a .snap file that maintains the list of files to be copied to the incremental backups
+Automation: To automate the backup, run this script from /etc/rc_local to make the backup when the computer is power on
+Usage     : ./backup &
