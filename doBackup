@@ -16,6 +16,10 @@
 #             list of the content of backup files.
 #             There is a exclusion file where you can establish all you will 
 #             not want to copy. 
+# Requires  : file_source #The file where configure the source backup folder
+#             file_target #The file where configure the Target backup folder
+#             file_exclusion #The file where configure the path and filename of 
+#             exclusion file
 # Files     : The full backup name is        'year-month-0-hostname-full.tar.bz2'
 #             The incremental backup name is 'year-month-day-hostname-inc.tar.bz2'
 #             The logs files has the same name but ending with .log instead of 
@@ -28,17 +32,18 @@
 # Usage     : ./doBackup &
 ##############################################################################
 
-#CONFIGURATION CONSTANTS - CHANGE THE VALUES
-   v_backup_source=/home                              #Source backup folder
-   v_backup_target=/smb/backup/user                   #Target backup folder
-  v_exclusion_file=/root/backup/backup-exclusion.txt  #path and filename of exclusion file
+#CONFIGURATION CONSTANTS - CHANGE THE VALUES IN THE CONFIGURATION FILES
+read -r v_backup_source  < "config_source"    || echo "ERROR: 'config_source' file not exist"; exit 1     #Source backup folder
+read -r v_backup_target  < "config_target"    || echo "ERROR: 'config_target' file not exist"; exit 1     #Target backup folder
+read -r v_exclusion_file < "config_exclusion" || echo "ERROR: 'config_exclusion' file not exist"; exit 1  #PATH and filename of exclusion file
 
 #Variables
-         V_VERSION="20151110"        #Version of this script 
+         V_VERSION="20151113"        #Version of this script 
         v_hostname=$(/bin/uname -n)  #Hostname where the script runs
       v_today_year=$(date +%Y)       #Year of today's date 
      v_today_month=$(date +%m)       #Month of today's date
        v_today_day=$(date +%d)       #Day of today's date
+      v_log_backup=$v_backup_target/$v_today_year-$v_today_month-backup-$v_hostname.log                #The log of backup activity filename
         v_log_full=$v_backup_target/$v_today_year-$v_today_month-00-$v_hostname.log                    #The log of full backup filename
          v_log_inc=$v_backup_target/$v_today_year-$v_today_month-$v_today_day-$v_hostname.log          #The log of incremental backup filename
        v_snap_file=$v_backup_target/$v_today_year-$v_today_month-$v_hostname.snap                      #The .snap file that maintains the list of files to be copied to the incremental backups
@@ -54,7 +59,7 @@
 f_log ()
 {
    f_timestamp
-   echo "$v_timestamp#$1" >> $v_log_full
+   echo "$v_timestamp#$1" >> $v_log_backup
 }
 
 ##############################################################################
@@ -77,7 +82,7 @@ f_timestamp ()
 f_source_exist ()
 {
    if [ ! -d $v_backup_source ]; then
-      f_log "Does not exist the source directory of the backup: $v_backup_source . Process aborted"
+      f_log "ERROR: Does not exist the source directory of the backup: $v_backup_source . Process aborted"
       exit 1
    else
       cd $v_backup_source
@@ -97,7 +102,7 @@ f_target_exist ()
       mkdir -p $v_backup_target
       if [ "$?" -ne 0 ]
       then
-         f_log "Can't create target directory of the backup: $v_backup_target . Process aborted"
+         f_log "ERROR: Can't create target directory of the backup: $v_backup_target . Process aborted"
          exit 1
       fi
    fi
@@ -114,7 +119,7 @@ f_exclusion_exist ()
 {
    if [ ! -f $v_exclusion_file ]; 
    then
-      f_log "Does not exist the exclusion file: $v_exclusion_file"
+      f_log "ERROR: Does not exist the exclusion file: $v_exclusion_file"
       v_exclusions=1
    else
       v_exclusions=0
@@ -133,11 +138,13 @@ f_full_inc ()
    if [ ! -f $v_backup_full ]
    then
       v_backup_file=$v_backup_full
+      v_log_file=$v_log_full
    elif [ ! -f $v_backup_inc ]
    then
       v_backup_file=$v_backup_inc
+      v_log_file=$v_log_inc
    else
-      f_log "Today existing file backup: $v_backup_inc . Process aborted"
+      f_log "INFO: Backup file: $v_backup_file . Exist. Process aborted"
       exit 2
    fi
 }
@@ -154,14 +161,17 @@ f_dobackup ()
    f_log "+++Starting backup+++"
    f_log "---Source directory of the backup: $v_backup_source ---"
    f_log "---Backup filename: $v_backup_file ---"
+   f_log "---Log filename:    $v_log_file ---"
    if [ $v_exclusions -eq 0 ]
    then
-      f_log "---Exclusion file: $v_exclusion_file ---"
-      tar $v_param_backup $v_backup_file -X $v_exclusion_file -g $v_snap_file * | grep -v /$ | tee -a $v_log_full | tee $v_log_inc
+      f_log "---Exclusion file:  $v_exclusion_file ---"
+      tar $v_param_backup $v_backup_file -X $v_exclusion_file -g $v_snap_file * | grep -v /$ | tee $v_log_file  
    else
-      tar $v_param_backup $v_backup_file -g $v_snap_file * | grep -v /$ | tee -a $v_log_full | tee $v_log_inc
+      f_log "---Exclusion file:  not exist ---"
+      tar $v_param_backup $v_backup_file -g $v_snap_file * | grep -v /$ | tee $v_log_file 
    fi
-   f_log "+++Ending backup+++"
+   f_log "---$(cat $v_log_file | wc -l) files succesfully backup"
+   f_log "+++Ending   backup+++"
 }
 ##############################################################################
 #
