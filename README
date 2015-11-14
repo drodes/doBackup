@@ -6,9 +6,15 @@ Operation : At the beginning of each month makes a full backup and every day of 
             If there isn't, makes the full backup, but if there is, makes an incremental backup since the last. 
             Also create log files with a list of the content of backup files.
             There is a exclusion file where you can establish all you will not want to copy. 
-Files     : The full backup name is        'year-month-00-hostname-full.tar.bz2'
-            The incremental backup name is 'year-month-day-hostname-inc.tar.bz2'
-            The logs files has the same name but ending with .log instead of .tar.gz2
-            There is a .snap file that maintains the list of files to be copied to the incremental backups
-Automation: To automate the backup, run this script from /etc/rc.local (as root) or ~/.bashrc (as user) to make the backup when the computer is power on
+Requires  : 'config_doBackup' is a text file with 2 or 3 lines
+            Fist line must contain the 'source backup folder'. Example: /home/user
+            Second line must contain the 'target backup folder'. Example: /smb/bck/user
+            Third line can contain the 'exclusion file' or nothing (is optional).
+Files out : The monthly full backup name is 'year-month-0-hostname-full.tar.bz2'
+            The monthly full backup log is  'year-month-0-hostname.log'
+            The incremental backup name is  'year-month-day-hostname-inc.tar.bz2'
+            The incremental backup log is   'year-month-day-hostname.log'
+            There is a monthly .snap file that maintains the list of files to be 
+            copied to the incremental backups
+Automation: To automate the backup, run this script from /etc/rc.local (as root) or ~/.bashrc (as user) to make the backup when the computer is power on. Or put in the crontab
 Usage     : ./doBackup &
