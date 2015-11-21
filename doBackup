@@ -16,7 +16,7 @@
 #             list of the content of backup files.
 #             There is a exclusion file where you can establish all you will 
 #             not want to copy. 
-# Requires  : 'config_doBackup' is a text file with 2 or 3 lines
+# Requires  : 'doBackup_config' is a text file with 2 or 3 lines
 #             Fist line must contain the 'source backup folder'. Example: /home/user
 #             Second line must contain the 'target backup folder'. Example: /smb/bck/user
 #             Third line can contain the 'exclusion file' or nothing (is optional).
@@ -40,13 +40,13 @@
 #    Third line can contain the 'exclusion file' or nothing. 
 #
 ##############################################################################
-   if [[ -f config_doBackup ]]
+   if [[ -f doBackup_config ]]
    then
       {
           read -r v_backup_source    #Source backup folder
           read -r v_backup_target    #Target backup folder
           read -r v_exclusion_file   #PATH and filename of exclusion file
-      } < config_doBackup            #Config file whit 2 or 3 lines: Source backup folder, Target backup folder, PATH and filename of exclusion file (optional)
+      } < doBackup_config            #Config file whit 2 or 3 lines: Source backup folder, Target backup folder, PATH and filename of exclusion file (optional)
    else
       echo "ERROR: Does not exist the config file: config_doBackup"
       exit 1
@@ -59,7 +59,7 @@
 # Variables
 #
 ##############################################################################
-         V_VERSION="20151114"        #Version of this script 
+         V_VERSION="20151121"        #Version of this script 
         v_hostname=$(/bin/uname -n)  #Hostname where the script runs
       v_today_year=$(date +%Y)       #Year of today's date 
      v_today_month=$(date +%m)       #Month of today's date
@@ -188,10 +188,10 @@ f_dobackup ()
    if [ $v_exclusions -eq 0 ]
    then
       f_log "---Exclusion file:  $v_exclusion_file ---"
-      tar $v_param_backup $v_backup_file -X $v_exclusion_file -g $v_snap_file * | grep -v /$ | tee $v_log_file  
+      tar $v_param_backup $v_backup_file -X $v_exclusion_file -g $v_snap_file ./* | grep -v /$ | tee $v_log_file  
    else
       f_log "---Exclusion file:  not exist ---"
-      tar $v_param_backup $v_backup_file -g $v_snap_file * | grep -v /$ | tee $v_log_file 
+      tar $v_param_backup $v_backup_file -g $v_snap_file ./* | grep -v /$ | tee $v_log_file 
    fi
    f_log "---$(cat $v_log_file | wc -l) files succesfully backup"
    f_log "+++Ending   backup+++"
