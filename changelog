@@ -1,0 +1,17 @@
+# Change Log
+All notable changes to this project will be documented in this file.
+
+2016-07-30 [v20160724] Dani Rodes
+    * doBackup: 
+      added feature --> backup_status
+          there is a status file created in every backup. 
+          this file is checked before doing a new backup. 
+          if previous backup was not completed succesfully, it is deleted.
+          the goal is avoid an incomplete backup.
+      added feature --> show_backup
+          when backup start, show a pop-up window in the desktop.
+          when it ends closes the pop-up window.
+          the goal is to show that the backup is running.
+
+2015-11-21 [v20151121] Dani Rodes
+    * doBackup: makes the backup succesfully

@@ -16,7 +16,7 @@
 #             list of the content of backup files.
 #             There is a exclusion file where you can establish all you will 
 #             not want to copy. 
-# Requires  : 'doBackup_config' is a text file with 2 or 3 lines
+# Requires  : 'doBackup_config' is a text file in the same directory, with 2 or 3 lines
 #             Fist line must contain the 'source backup folder'. Example: /home/user
 #             Second line must contain the 'target backup folder'. Example: /smb/bck/user
 #             Third line can contain the 'exclusion file' or nothing (is optional).
@@ -34,7 +34,8 @@
 
 ##############################################################################
 #
-# Check config file. The config_doBackup is a text file with 2 or 3 lines
+# Check config file. The doBackup_config is a text file in the same directory, 
+#    with 2 or 3 lines
 #    Fist line must contain the 'source backup folder'. Example: /home/user
 #    Second line must contain the 'target backup folder'. Example: /smb/bck/user
 #    Third line can contain the 'exclusion file' or nothing. 
@@ -48,18 +49,20 @@
           read -r v_exclusion_file   #PATH and filename of exclusion file
       } < doBackup_config            #Config file whit 2 or 3 lines: Source backup folder, Target backup folder, PATH and filename of exclusion file (optional)
    else
-      echo "ERROR: Does not exist the config file: config_doBackup"
+      v_pwd=$(pwd)                   #working directory
+      echo "ERROR: Does not exist the config file: 'doBackup_config' in '$v_pwd'" >&2
+      pkill xmessage                 #Close the pop-up window to show at X-session that backup is finished
       exit 1
    fi
-   [[ -n "$v_backup_source" ]] || { echo "ERROR in config_doBackup: Fist line must contain the 'source backup folder'. Example: /home/user" >&2; exit 1; }
-   [[ -n "$v_backup_target" ]] || { echo "ERROR in config_doBackup: Second line must contain the 'target backup folder'. Example: /smb/bck/user" >&2; exit 1; }
+   [[ -n "$v_backup_source" ]] || { echo "ERROR in doBackup_config: Fist line must contain the 'source backup folder'. Example: /home/user" >&2; pkill xmessage; exit 1; }
+   [[ -n "$v_backup_target" ]] || { echo "ERROR in doBackup_config: Second line must contain the 'target backup folder'. Example: /smb/bck/user" >&2; pkill xmessage; exit 1; }
 
 ##############################################################################
 #
 # Variables
 #
 ##############################################################################
-         V_VERSION="20151121"        #Version of this script 
+         V_VERSION="20160730"        #Version of this script 
         v_hostname=$(/bin/uname -n)  #Hostname where the script runs
       v_today_year=$(date +%Y)       #Year of today's date 
      v_today_month=$(date +%m)       #Month of today's date
@@ -70,6 +73,8 @@
        v_snap_file=$v_backup_target/$v_today_year-$v_today_month-$v_hostname.snap                      #The .snap file that maintains the list of files to be copied to the incremental backups
      v_backup_full=$v_backup_target/$v_today_year-$v_today_month-00-full-$v_hostname.tar.bz2           #The full backup filename
       v_backup_inc=$v_backup_target/$v_today_year-$v_today_month-$v_today_day-inc-$v_hostname.tar.bz2  #The incremental backup filename
+     v_status_full=$v_backup_target/$v_today_year-$v_today_month-00-full-$v_hostname.status            #The full backup status filename
+      v_status_inc=$v_backup_target/$v_today_year-$v_today_month-$v_today_day-inc-$v_hostname.status   #The incremental backup status filename
     v_param_backup="-c -p -j -v -f"                                                                    #Tar parameters (Create,Preserve permissions,bz2 compression,Verbose,File)
 
 ##############################################################################
@@ -105,6 +110,7 @@ f_source_exist ()
    if [[ ! -d "$v_backup_source" ]]
    then
       f_log "ERROR: Does not exist the source directory of the backup: $v_backup_source . Process aborted"
+      pkill xmessage                 #Close the pop-up window to show at X-session that backup is finished
       exit 1
    else
       cd $v_backup_source
@@ -126,6 +132,7 @@ f_target_exist ()
       if [[ "$?" -ne 0 ]]
       then
          f_log "ERROR: Can't create target directory of the backup: $v_backup_target . Process aborted"
+         pkill xmessage                 #Close the pop-up window to show at X-session that backup is finished
          exit 1
       fi
    fi
@@ -135,7 +142,7 @@ f_target_exist ()
 #
 # Check if there is the exclusion file of the backup 
 # No --> configure backup without exclusions
-# Si --> configure backup with exclusions
+# Yes --> configure backup with exclusions
 #
 ##############################################################################
 f_exclusion_exist ()
@@ -151,9 +158,73 @@ f_exclusion_exist ()
 
 ##############################################################################
 #
+# Put the backup status 'in_progress'
+#
+##############################################################################
+f_in_progress_status ()
+{
+   f_log "---Changing backup status --> in_progress"
+   touch "$v_status_file".in_progress
+}
+
+##############################################################################
+#
+# Put the backup status 'done'
+#
+##############################################################################
+f_done_status ()
+{
+   if [[ -f "$v_status_file".in_progress ]]
+   then
+      f_log "---Changing backup status --> done"
+      mv "$v_status_file".in_progress "$v_status_file".done
+   fi
+}
+
+##############################################################################
+#
+# Check the status of the last backup
+# in_progress --> delete the backup file. it was incomplete
+# done --> is ready to do new backup
+#
+##############################################################################
+f_last_status ()
+{
+   V_IN_PROGRESS=$(find $v_backup_target -name *.status.in_progress -print0)
+   if [[ -f "$V_IN_PROGRESS" ]]
+   then
+      V_IN_PROGRESS_FILE=$(ls "$V_IN_PROGRESS" | cut -d. -f1)
+      f_log "INFO: The backup file '$V_IN_PROGRESS_FILE.tar.bz2' was stopped when it was in progress."
+      if [[ -f "$V_IN_PROGRESS_FILE".tar.bz2 ]]
+      then
+         rm "$V_IN_PROGRESS_FILE".*
+         if [[ "$?" -eq 0 ]]
+         then
+            f_log "INFO: Deleting the unfinished backup file '$V_IN_PROGRESS_FILE.tar.bz2'"
+         else
+            f_log "ERROR: Can't delete the unfinished backup file '$V_IN_PROGRESS_FILE.tar.bz2'"
+         fi
+      else
+         f_log "ERROR: Can't find the backup file '$V_IN_PROGRESS_FILE.tar.bz2'" 
+      fi
+   else
+      V_DONE=$(find $v_backup_target -name *.status.done -print0)
+      if [[ -f "$V_DONE" ]]
+      then
+         V_DONE_FILE=$(ls "$V_DONE" | cut -d. -f1)
+         f_log "INFO: The backup '$V_DONE_FILE' was finished succesfully."
+      else
+         f_log "WARNING: Can't find the last 'status backup file'" 
+      fi
+   fi
+}
+
+##############################################################################
+#
 # Check for the full backup of this month
 # No --> configure full backup 
-# Si --> configure incremental backup
+# Yes --> configure incremental backup
+# If today's backup exist --> Process aborted. Once a day is enough
 #
 ##############################################################################
 f_full_inc ()
@@ -162,14 +233,18 @@ f_full_inc ()
    then
       v_backup_file=$v_backup_full
       v_log_file=$v_log_full
+      v_status_file=$v_status_full
    elif [[ ! -f "$v_backup_inc" ]]
    then
       v_backup_file=$v_backup_inc
       v_log_file=$v_log_inc
+      v_status_file=$v_status_inc
    else
-      f_log "INFO: Backup file: $v_backup_file . Exist. Process aborted"
+      f_log "INFO: Backup file: $v_backup_inc . Exist. Process aborted"
+      pkill xmessage                 #Close the pop-up window to show at X-session that backup is finished
       exit 2
    fi
+   rm "$V_DONE"   #Deletes the last status (done) backup file
 }
 
 ##############################################################################
@@ -181,10 +256,10 @@ f_full_inc ()
 ##############################################################################
 f_dobackup ()
 {
-   f_log "+++Starting backup+++"
    f_log "---Source directory of the backup: $v_backup_source ---"
    f_log "---Backup filename: $v_backup_file ---"
    f_log "---Log filename:    $v_log_file ---"
+   f_log "---Status filename: $v_status_file ---"
    if [ $v_exclusions -eq 0 ]
    then
       f_log "---Exclusion file:  $v_exclusion_file ---"
@@ -194,19 +269,24 @@ f_dobackup ()
       tar $v_param_backup $v_backup_file -g $v_snap_file ./* | grep -v /$ | tee $v_log_file 
    fi
    f_log "---$(cat $v_log_file | wc -l) files succesfully backup"
-   f_log "+++Ending   backup+++"
 }
 ##############################################################################
 #
 # Main
 #
 ##############################################################################
+xmessage "Backup is running. Please don't close this window. Minimize" &   #Open a pop-up window to show at X-session that backup is running
 f_target_exist
 f_source_exist
 f_exclusion_exist
+f_last_status
 f_full_inc
+f_log "+++Starting backup+++v$V_VERSION+++"
+f_in_progress_status
 f_dobackup
-
+f_done_status
+f_log "+++Ending   backup+++"
+pkill xmessage      #Close the pop-up window to show at X-session that backup is finished
 ##############################################################################
 ## TAR parameters
 #  -A, --catenate, --concatenate
@@ -256,5 +336,4 @@ f_dobackup
 #     --format=gnu -f- -b20 --quoting-style=escape --rmt-command=/usr/lib/tar/rmt --rsh-command=/usr/bin/rsh
 #The first argument to tar should be a function; either one of the letters Acdrtux, or one of the long function names. A function letter need not be prefixed with ``-'', and may be combined with other single-letter options.  A long function name must be prefixed with --. Some options take a parameter; with the single-letter form these must be given as separate arguments.  With the long form, they may be given by appending =value to the option.
 #
-
 
