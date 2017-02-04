@@ -5,49 +5,60 @@
 
 ##############################################################################
 # Name      : doBackup
-# Llicense  : The MIT License (MIT)
+# License   : The MIT License (MIT)
 # Goal      : Makes directory backups, for example your home directory, 
 #             compressed with tar.bz2
 # Operation : At the beginning of each month makes a full backup and every day 
 #             of the month makes an incremental backup.
-#             The scrip verifies if exist the full backup of this month. 
-#             If there isn't, makes the full backup, but if there is, makes an 
-#             incremental backup since the last. Also create log files with a 
-#             list of the content of backup files.
-#             There is a exclusion file where you can establish all you will 
-#             not want to copy. 
-# Requires  : 'doBackup_config' is a text file in the same directory, with 2 or 3 lines
-#             Fist line must contain the 'source backup folder'. Example: /home/user
-#             Second line must contain the 'target backup folder'. Example: /smb/bck/user
-#             Third line can contain the 'exclusion file' or nothing (is optional).
+#             The scrip verifies if exist the full backup of this month.
+#             If there isn't, makes the full backup, but if there is the full 
+#             backup, makes an incremental backup since the last.
+#             Also create log files with a list of the content of backup files.
+#             Although you execute the script several blows at the same day, it 
+#             only does one backup every day
+#             You can create a exclusion file where you can establish all the 
+#             files that you will not want to copy.
+#             You can config the persistence period of the backups. Backups 
+#             beyond this period will be deleted.
+# Requires  : 'config_doBackup' is a text file with 4 lines
+#             The fist line must contain the 'source backup folder'. 
+#             Example: /home/user
+#             The second line must contain the 'target backup folder'. 
+#             Example: /smb/bck/user
+#             The third line can contain the 'exclusion file' or nothing, is 
+#             optional. If you does not want use the 'exclusion file' you must 
+#             leave a blank line
+#             The fourth line can contain the 'persistence period' expressed 
+#             in days. Is optional but if is null, the default is 120.
 # Files out : The monthly full backup name is 'year-month-0-hostname-full.tar.bz2'
 #             The monthly full backup log is  'year-month-0-hostname.log'
 #             The incremental backup name is  'year-month-day-hostname-inc.tar.bz2'
 #             The incremental backup log is   'year-month-day-hostname.log'
-#             There is a monthly .snap file that maintains the list of files to be 
+#             There is a monthly .snap file that maintains the list of files to be
 #             copied to the incremental backups
-# Automation: To automate the backup, run this script from /etc/rc.local (as 
-#             root) or ~/.bashrc (as user) to make the backup when the computer 
-#             is power on. Or put in the crontab
+# Automation: To automate the backup, run this script from /etc/rc.local (as root) or ~/.bashrc (as user) to make the backup when the computer is power on. 
+#             Or put in the crontab like: @reboot cd /root/backup/ ; /usr/bin/nice -n 19 /usr/bin/ionice -c2 -n7 /bin/bash /root/backup/doBackup 2>/root/backup/backup.err
 # Usage     : ./doBackup &
 ##############################################################################
 
 ##############################################################################
 #
 # Check config file. The doBackup_config is a text file in the same directory, 
-#    with 2 or 3 lines
-#    Fist line must contain the 'source backup folder'. Example: /home/user
-#    Second line must contain the 'target backup folder'. Example: /smb/bck/user
-#    Third line can contain the 'exclusion file' or nothing. 
+#    with 4 lines
+#    The fist line must contain the 'source backup folder'. Example: /home/user
+#    The second line must contain the 'target backup folder'. Example: /smb/bck/user
+#    The third line can contain the 'exclusion file' or nothing. 
+#    The fourth line can contain the 'persistence period' or nothing. 
 #
 ##############################################################################
    if [[ -f doBackup_config ]]
    then
       {
-          read -r v_backup_source    #Source backup folder
-          read -r v_backup_target    #Target backup folder
-          read -r v_exclusion_file   #PATH and filename of exclusion file
-      } < doBackup_config            #Config file whit 2 or 3 lines: Source backup folder, Target backup folder, PATH and filename of exclusion file (optional)
+          read -r v_backup_source        #Source backup folder
+          read -r v_backup_target        #Target backup folder
+          read -r v_exclusion_file       #PATH and filename of exclusion file
+          read -r v_persistence_period   #persistence period expressed in days
+      } < doBackup_config                #Config file whit 4 lines: Source backup folder, Target backup folder, PATH and filename of exclusion file (or blank line), persistence period expressed on days (or blank line)
    else
       v_pwd=$(pwd)                   #working directory
       echo "ERROR: Does not exist the config file: 'doBackup_config' in '$v_pwd'" >&2
@@ -56,17 +67,20 @@
    fi
    [[ -n "$v_backup_source" ]] || { echo "ERROR in doBackup_config: Fist line must contain the 'source backup folder'. Example: /home/user" >&2; pkill xmessage; exit 1; }
    [[ -n "$v_backup_target" ]] || { echo "ERROR in doBackup_config: Second line must contain the 'target backup folder'. Example: /smb/bck/user" >&2; pkill xmessage; exit 1; }
+   [[ "$v_persistence_period" && "$v_persistence_period" = *[0-9]* ]] || v_persistence_period=120      #If $v_persistence_period is null or not numeric assign default value
 
 ##############################################################################
 #
 # Variables
 #
 ##############################################################################
-         V_VERSION="20160730"        #Version of this script 
+         V_VERSION="20170204"        #Version of this script 
         v_hostname=$(/bin/uname -n)  #Hostname where the script runs
       v_today_year=$(date +%Y)       #Year of today's date 
-     v_today_month=$(date +%m)       #Month of today's date
-       v_today_day=$(date +%d)       #Day of today's date
+     v_today_month=$(date +%m)       #Month of today's date, not padded
+   v_numeric_month=$(date +%-m)      #Month of today's date, padded
+       v_today_day=$(date +%d)       #Day of today's date, not padded
+     v_numeric_day=$(date +%-d)      #Day of today's date, padded
       v_log_backup=$v_backup_target/$v_today_year-$v_today_month-backup-$v_hostname.log                #The log of backup activity filename
         v_log_full=$v_backup_target/$v_today_year-$v_today_month-00-$v_hostname.log                    #The log of full backup filename
          v_log_inc=$v_backup_target/$v_today_year-$v_today_month-$v_today_day-$v_hostname.log          #The log of incremental backup filename
@@ -76,6 +90,7 @@
      v_status_full=$v_backup_target/$v_today_year-$v_today_month-00-full-$v_hostname.status            #The full backup status filename
       v_status_inc=$v_backup_target/$v_today_year-$v_today_month-$v_today_day-inc-$v_hostname.status   #The incremental backup status filename
     v_param_backup="-c -p -j -v -f"                                                                    #Tar parameters (Create,Preserve permissions,bz2 compression,Verbose,File)
+       c_year_days=365               #number of days of 1 year (aprox)
 
 ##############################################################################
 #
@@ -109,7 +124,7 @@ f_source_exist ()
 {
    if [[ ! -d "$v_backup_source" ]]
    then
-      f_log "ERROR: Does not exist the source directory of the backup: $v_backup_source . Process aborted"
+      f_log "ERROR: Does not exist the backup's source directory: $v_backup_source . Process aborted"
       pkill xmessage                 #Close the pop-up window to show at X-session that backup is finished
       exit 1
    else
@@ -120,21 +135,16 @@ f_source_exist ()
 ##############################################################################
 #
 # Check if there is target directory of the backup 
-# No --> Try to create
-#    No --> exit
+# No --> exit
 #
 ##############################################################################
 f_target_exist ()
 {
    if [[ ! -d "$v_backup_target" ]]
    then
-      mkdir -p $v_backup_target
-      if [[ "$?" -ne 0 ]]
-      then
-         f_log "ERROR: Can't create target directory of the backup: $v_backup_target . Process aborted"
-         pkill xmessage                 #Close the pop-up window to show at X-session that backup is finished
-         exit 1
-      fi
+      f_log "ERROR: Does not exist the backup's target directory: $v_backup_target . Process aborted"
+      pkill xmessage                 #Close the pop-up window to show at X-session that backup is finished
+      exit 1
    fi
 }
 
@@ -270,6 +280,84 @@ f_dobackup ()
    fi
    f_log "---$(cat $v_log_file | wc -l) files succesfully backup"
 }
+
+##############################################################################
+#
+# Gets the number of days of each month
+#
+##############################################################################
+f_month_days ()
+{
+   v_month_days=30 #default value
+   case $1 in
+      1|3|5|7|8|10|12) v_month_days=31 ;;
+      4|6|9|11) v_month_days=30 ;;
+      2) v_month_days=28 ;;
+   esac
+}
+
+##############################################################################
+#
+# Gets the difference of days between two dates
+# Calculates the time (in days) of the file, since the day 0000-01-01
+# Calculate the difference of two previous calculations
+# YYYY-MM-DD-*  
+# 00000000011  
+# 12345678901
+#
+##############################################################################
+f_difference ()
+{
+   v_old_file_name=$(echo "$1" | awk 'BEGIN{FS="/"} {print $NF}')
+   v_old_file_year=$(echo "$v_old_file_name" | cut -c 1-4)
+   v_zero=$(echo "$v_old_file_name" | cut -c 6)
+   if [[ "$v_zero" -eq "0" ]] #gets the month number
+   then
+      v_old_file_month=$(echo "$v_old_file_name" | cut -c 7) 
+   else
+      v_old_file_month=$(echo "$v_old_file_name" | cut -c 6-7) 
+   fi
+   f_month_days $v_old_file_month
+   v_zero=$(echo "$v_old_file_name" | cut -c 9) 
+   if [[ "$v_zero" = *[0-9]* ]] #gets the day number
+   then
+      if [[ "$v_zero" -eq "0" ]]
+      then
+         v_old_file_day=$(echo "$v_old_file_name" | cut -c 10) 
+      else
+         v_old_file_day=$(echo "$v_old_file_name" | cut -c 9-10) 
+      fi
+   else
+      v_old_file_day=31 
+   fi
+   let "v_old_file_days=($v_old_file_year*$c_year_days)+($v_old_file_month*$v_month_days)+($v_old_file_day)" 
+   let "v_difference=$v_today_days-$v_old_file_days" 
+}
+
+##############################################################################
+#
+# Delete the expired files. Files with persistence period exceeded
+# Calculates the time (in days) of today, since the day 0000-01-01
+# Gets the list of backup files and the difference of date between today and 
+# the backup files
+# If the difference is greather than the persistence period, the file is expired
+#
+##############################################################################
+f_delete_expired ()
+{
+   f_month_days $v_numeric_month
+   let "v_today_days=($v_today_year*$c_year_days)+($v_numeric_month*$v_month_days)+($v_numeric_day)" #dies des de l'any 0 fins avui. hi ha error per simplificar que tambe s'aplicara al fitxer de copia
+   echo "$v_persistence_period"
+   for i in $(ls $v_backup_target/????-??-* | sort) #obtenim els fitxers a tractar
+   do
+      f_difference $i
+      if [[ "$v_difference" -gt "$v_persistence_period" ]]
+      then
+         /bin/rm $i && f_log "---Deleted file:    $i ($v_difference days. Expired)"
+      fi
+   done
+}
+
 ##############################################################################
 #
 # Main
@@ -285,6 +373,7 @@ f_log "+++Starting backup+++v$V_VERSION+++"
 f_in_progress_status
 f_dobackup
 f_done_status
+f_delete_expired
 f_log "+++Ending   backup+++"
 pkill xmessage      #Close the pop-up window to show at X-session that backup is finished
 ##############################################################################
