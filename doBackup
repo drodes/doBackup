@@ -362,10 +362,6 @@ f_delete_expired ()
 {
    f_month_days $v_numeric_month
    v_today_days=$(( ( $v_today_year * $c_year_days ) +  $v_sum_month_days  +  $v_numeric_day )) #days from year 0 until today
-   if [[ $v_persistence_period -eq 0 ]]
-   then
-      f_rotate_backup
-   fi
    for i in $(ls $v_backup_target/????-??-* | sort) #gets the backup files
    do
       f_difference $i
