@@ -1,6 +1,12 @@
 # Change Log
 All notable changes to this project will be documented in this file.
 
+2017-03-15 [v20170315] Dani Rodes
+    * doBackup: 
+      fixed feature --> persistence_period
+          it has increased the accuracy in the calculation of the 
+          expiration date of a file
+
 2017-02-04 [v20170204] Dani Rodes
     * doBackup: 
       added feature --> persistence_period

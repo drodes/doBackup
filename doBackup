@@ -74,7 +74,7 @@
 # Variables
 #
 ##############################################################################
-         V_VERSION="20170204"        #Version of this script 
+         V_VERSION="20170315"        #Version of this script 
         v_hostname=$(/bin/uname -n)  #Hostname where the script runs
       v_today_year=$(date +%Y)       #Year of today's date 
      v_today_month=$(date +%m)       #Month of today's date, not padded
@@ -270,30 +270,45 @@ f_dobackup ()
    f_log "---Backup filename: $v_backup_file ---"
    f_log "---Log filename:    $v_log_file ---"
    f_log "---Status filename: $v_status_file ---"
-   if [ $v_exclusions -eq 0 ]
+   if [[ $v_exclusions -eq 0 ]]
    then
       f_log "---Exclusion file:  $v_exclusion_file ---"
       tar $v_param_backup $v_backup_file -X $v_exclusion_file -g $v_snap_file ./* | grep -v /$ | tee $v_log_file  
+      v_error=$?
    else
       f_log "---Exclusion file:  not exist ---"
       tar $v_param_backup $v_backup_file -g $v_snap_file ./* | grep -v /$ | tee $v_log_file 
+      v_error=$?
    fi
-   f_log "---$(cat $v_log_file | wc -l) files succesfully backup"
+   if [[ "$v_error" -eq 0 ]]
+   then
+      f_log "---$(cat $v_log_file | wc -l) files succesfully backup"
+   else
+      f_log "---ERROR: $v_error"
+      f_log "---ABORTING BACKUP---"
+   fi
 }
 
 ##############################################################################
 #
-# Gets the number of days of each month
+# It obtains the days of each month from the beginning of the year until the 
+# current month and the sum of all
 #
 ##############################################################################
 f_month_days ()
 {
-   v_month_days=30 #default value
-   case $1 in
-      1|3|5|7|8|10|12) v_month_days=31 ;;
-      4|6|9|11) v_month_days=30 ;;
-      2) v_month_days=28 ;;
-   esac
+   v_sum_month_days=0 #starting value
+   v_i=1              #starting valuefor the loop
+   while [[ $v_i -lt $1 ]] 
+   do
+      case $v_i in
+         1|3|5|7|8|10|12) v_month_days=31 ;;
+         4|6|9|11) v_month_days=30 ;;
+         2) v_month_days=28 ;;
+      esac
+      v_sum_month_days=$(( $v_sum_month_days + $v_month_days ))
+      v_i=$(( $v_i + 1 ))
+   done
 }
 
 ##############################################################################
@@ -330,8 +345,8 @@ f_difference ()
    else
       v_old_file_day=31 
    fi
-   let "v_old_file_days=($v_old_file_year*$c_year_days)+($v_old_file_month*$v_month_days)+($v_old_file_day)" 
-   let "v_difference=$v_today_days-$v_old_file_days" 
+   v_old_file_days=$(( ( $v_old_file_year * $c_year_days ) +  $v_sum_month_days  +  $v_old_file_day )) #days from year 0 until the backup file's day
+   v_difference=$(( $v_today_days - $v_old_file_days ))  #days of difference between the backup file's day and today 
 }
 
 ##############################################################################
@@ -346,14 +361,17 @@ f_difference ()
 f_delete_expired ()
 {
    f_month_days $v_numeric_month
-   let "v_today_days=($v_today_year*$c_year_days)+($v_numeric_month*$v_month_days)+($v_numeric_day)" #dies des de l'any 0 fins avui. hi ha error per simplificar que tambe s'aplicara al fitxer de copia
-   echo "$v_persistence_period"
-   for i in $(ls $v_backup_target/????-??-* | sort) #obtenim els fitxers a tractar
+   v_today_days=$(( ( $v_today_year * $c_year_days ) +  $v_sum_month_days  +  $v_numeric_day )) #days from year 0 until today
+   if [[ $v_persistence_period -eq 0 ]]
+   then
+      f_rotate_backup
+   fi
+   for i in $(ls $v_backup_target/????-??-* | sort) #gets the backup files
    do
       f_difference $i
       if [[ "$v_difference" -gt "$v_persistence_period" ]]
       then
-         /bin/rm $i && f_log "---Deleted file:    $i ($v_difference days. Expired)"
+         #/bin/rm $i && f_log "---Deleted file:    $i ($v_difference days. Expired)"
       fi
    done
 }
