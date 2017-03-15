@@ -371,7 +371,7 @@ f_delete_expired ()
       f_difference $i
       if [[ "$v_difference" -gt "$v_persistence_period" ]]
       then
-         #/bin/rm $i && f_log "---Deleted file:    $i ($v_difference days. Expired)"
+         /bin/rm $i && f_log "---Deleted file:    $i ($v_difference days. Expired)"
       fi
    done
 }
