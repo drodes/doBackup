@@ -179,15 +179,18 @@ f_in_progress_status ()
 
 ##############################################################################
 #
-# Put the backup status 'done'
+# Put the backup status 'done' if tar has finished whitout errors
 #
 ##############################################################################
 f_done_status ()
 {
-   if [[ -f "$v_status_file".in_progress ]]
+   if [[ "$v_error" -eq 0 ]]
    then
-      f_log "---Changing backup status --> done"
-      mv "$v_status_file".in_progress "$v_status_file".done
+      if [[ -f "$v_status_file".in_progress ]]
+      then
+         f_log "---Changing backup status --> done"
+         mv "$v_status_file".in_progress "$v_status_file".done
+      fi
    fi
 }
 
