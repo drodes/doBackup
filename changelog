@@ -1,6 +1,12 @@
 # Change Log
 All notable changes to this project will be documented in this file.
 
+2017-05-28 [v20170528] Dani Rodes
+    * doBackup: 
+      added feature --> months_full_backup
+          you can config the months of the year in which a complete backup 
+          must be made.
+
 2017-03-15 [v20170315] Dani Rodes
     * doBackup: 
       fixed feature --> persistence_period
