@@ -1,6 +1,10 @@
 # Change Log
 All notable changes to this project will be documented in this file.
 
+2017-06-04 [v20170604] Dani Rodes
+    * doBackup: 
+      fixed feature --> months_full_backup
+
 2017-05-28 [v20170528] Dani Rodes
     * doBackup: 
       added feature --> months_full_backup

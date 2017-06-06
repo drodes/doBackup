@@ -3,49 +3,50 @@
 #set -o xtrace
 #set -o nounset
 
-##############################################################################
+####################################################################################################
 # Name      : doBackup
 # License   : The MIT License (MIT)
 # Goal      : Makes directory backups, for example your home directory, 
 #             compressed with tar.bz2
-# Operation : At the beginning of each month makes a full backup and every day 
-#             of the month makes an incremental backup.
-#             The scrip verifies if exist the full backup of this month.
-#             If there isn't, makes the full backup, but if there is the full 
-#             backup, makes an incremental backup since the last.
-#             Also create log files with a list of the content of backup files.
-#             Although you execute the script several blows at the same day, it 
-#             only does one backup every day
-#             You can create a exclusion file where you can establish all the 
-#             files that you will not want to copy.
-#             You can config the persistence period of the backups. Backups
-#             beyond this period will be deleted.
+# Operation : At the configured months makes a full backup and the rest of the days makes an
+#             incremental backup.
+#             The scrip verifies if exist the full backup of this month and if this a month in which
+#             a full-backup must be made.
+#             If there is but do not exist the full-backup, makes the full-backup, but if there is
+#             the full-backup, makes an incremental backup since the last.
+#             Also create log files with a list of the content of backup files. You can 'grep' this
+#             logs for search files keeped in the backups.
+#             Although you execute the script several blows at the same day, it only does one backup
+#             every day.
+#             You can create a exclusion file where you can establish all the files that you will
+#             not want to copy.
+#             You can config the persistence period of the backups. Backups beyond this period will
+#             be deleted.
 # Requires  : 'doBackup_config' is a text file with 5 lines
 #             The fist line must contain the 'source backup folder'. 
 #             Example: /home/user
 #             The second line must contain the 'target backup folder'. 
 #             Example: /smb/bck/user
-#             The third line contains the 'exclusion file' (or a blank line), is 
-#             optional. If you does not want use the 'exclusion file' you must 
-#             leave a blank line
-#             The fourth line contains the 'persistence period' (or a blank line)
-#             expressed in days. Is optional but if is a blank line, the default is: 120.
-#             The fifth line contains the number of months of the year, separated 
-#             by blank, in which a complete backup must be made (or a blank line).
+#             The third line contains the 'exclusion file' (or a blank line), is optional. If you
+#             does not want use the 'exclusion file' you must leave a blank line
+#             The fourth line contains the 'persistence period' (or a blank line) expressed in days.
+#             Is optional but if is a blank line, the default is: 120.
+#             The fifth line contains the number of months of the year, separated by blank, in which
+#             a complete backup must be made (or a blank line).
 #             Is optional but if is null, the default months are: 1 4 7 10
 #             Example: 1,4,7,10 will make full-backups on january, april, july and october
 # Files out : The monthly full backup name is 'year-month-0-hostname-full.tar.bz2'
 #             The monthly full backup log is  'year-month-0-hostname.log'
 #             The incremental backup name is  'year-month-day-hostname-inc.tar.bz2'
 #             The incremental backup log is   'year-month-day-hostname.log'
-#             There is a monthly .snap file that maintains the list of files to be
-#             copied to the incremental backups
+#             There is a .snap file that maintains the list of files to be copied to the incremental
+#             backups
 # Automation: To automate the backup, run this script from /etc/rc.local (as root) or ~/.bashrc (as user) to make the backup when the computer is power on. 
 #             Or put in the crontab like: @reboot cd /root/backup/ ; /usr/bin/nice -n 19 /usr/bin/ionice -c2 -n7 /bin/bash /root/backup/doBackup 2>/root/backup/backup.err
 # Usage     : ./doBackup &
-##############################################################################
+####################################################################################################
 
-##############################################################################
+####################################################################################################
 #
 # IMPORTANT
 # Check config file. The doBackup_config is a text file in the same directory, 
@@ -57,7 +58,7 @@
 #    - The fifth line contains the number of 'months of the year, separated by blank,      Example: 1 4 7 10 
 #      in which a complete backup must be made', or is a blank line.
 #
-##############################################################################
+####################################################################################################
    if [[ -f doBackup_config ]]
    then
       {
@@ -78,12 +79,12 @@
    [[ "$v_persistence" && "$v_persistence" = *[0-9]* ]] || v_persistence=120    #If $v_persistence is null or not numeric assign DEFAULT VALUE
    [[ "$v_month_full_bck" ]] || v_month_full_bck="1 4 7 10"                     #If $v_month_full_bck is null assign DEFAULT VALUE for months in which a full-backup must be made
 
-##############################################################################
+####################################################################################################
 #
 # Variables
 #
-##############################################################################
-         V_VERSION="20170528"        #Version of this script 
+####################################################################################################
+         V_VERSION="20170604"        #Version of this script 
         v_hostname=$(/bin/uname -n)  #Hostname where the script runs
       v_today_year=$(date +%Y)       #Year of today's date 
      v_today_month=$(date +%m)       #Month of today's date, not padded
@@ -93,7 +94,7 @@
       v_log_backup=$v_backup_target/$v_today_year-$v_today_month-backup-$v_hostname.log                #The log of backup activity filename
         v_log_full=$v_backup_target/$v_today_year-$v_today_month-00-$v_hostname.log                    #The log of full backup filename
          v_log_inc=$v_backup_target/$v_today_year-$v_today_month-$v_today_day-$v_hostname.log          #The log of incremental backup filename
-       v_snap_file=$v_backup_target/$v_today_year-$v_today_month-$v_hostname.snap                      #The .snap file that maintains the list of files to be copied to the incremental backups
+       v_snap_file=$v_backup_target/index-doBackup-$v_hostname.snap                                    #The .snap file that maintains the list of files to be copied to the incremental backups
      v_backup_full=$v_backup_target/$v_today_year-$v_today_month-00-full-$v_hostname.tar.bz2           #The full backup filename
       v_backup_inc=$v_backup_target/$v_today_year-$v_today_month-$v_today_day-inc-$v_hostname.tar.bz2  #The incremental backup filename
      v_status_full=$v_backup_target/$v_today_year-$v_today_month-00-full-$v_hostname.status            #The full backup status filename
@@ -101,34 +102,34 @@
     v_param_backup="-c -p -j -v -f"                                                                    #Tar parameters (Create,Preserve permissions,bz2 compression,Verbose,File)
        c_year_days=365               #number of days of 1 year (aprox)
 
-##############################################################################
+####################################################################################################
 #
 # Create the timestamp
 #
-##############################################################################
+####################################################################################################
 f_timestamp ()
 {
    v_timestamp=$(date +%Y%m%d_%H%M%S)
 }
 
-##############################################################################
+####################################################################################################
 #
 # Annotate the timestamp and the message in the log file
 #
-##############################################################################
+####################################################################################################
 f_log ()
 {
    f_timestamp
    echo "$v_timestamp#$1" >> $v_log_backup
 }
 
-##############################################################################
+####################################################################################################
 #
 # Check if there is source directory of the backup
 # No  --> exit
 # yes --> cd
 #
-##############################################################################
+####################################################################################################
 f_source_exist ()
 {
    if [[ ! -d "$v_backup_source" ]]
@@ -141,12 +142,12 @@ f_source_exist ()
    fi
 }
 
-##############################################################################
+####################################################################################################
 #
 # Check if there is target directory of the backup 
 # No --> exit
 #
-##############################################################################
+####################################################################################################
 f_target_exist ()
 {
    if [[ ! -d "$v_backup_target" ]]
@@ -157,13 +158,13 @@ f_target_exist ()
    fi
 }
 
-##############################################################################
+####################################################################################################
 #
 # Check if there is the exclusion file of the backup 
 # No --> configure backup without exclusions
 # Yes --> configure backup with exclusions
 #
-##############################################################################
+####################################################################################################
 f_exclusion_exist ()
 {
    if [[ "$v_exclusion_file" ]]
@@ -181,22 +182,22 @@ f_exclusion_exist ()
    fi
 }
 
-##############################################################################
+####################################################################################################
 #
 # Put the backup status 'in_progress'
 #
-##############################################################################
+####################################################################################################
 f_in_progress_status ()
 {
    f_log "---Changing backup status --> in_progress"
    touch "$v_status_file".in_progress
 }
 
-##############################################################################
+####################################################################################################
 #
 # Put the backup status 'done' if tar has finished whitout errors
 #
-##############################################################################
+####################################################################################################
 f_done_status ()
 {
    if [[ "$v_error" -eq 0 ]]
@@ -209,13 +210,13 @@ f_done_status ()
    fi
 }
 
-##############################################################################
+####################################################################################################
 #
 # Check the status of the last backup
 # in_progress --> delete the backup file. it was incomplete
 # done --> is ready to do new backup
 #
-##############################################################################
+####################################################################################################
 f_last_status ()
 {
    V_IN_PROGRESS=$(find $v_backup_target -name *.status.in_progress -print0)
@@ -247,45 +248,57 @@ f_last_status ()
    fi
 }
 
-##############################################################################
+####################################################################################################
 #
 # Check for the full backup of this month
 # Is this month a month in which a full-backup must be made but this full-backup not exists ?
-# Yes --> configure full backup 
+# Yes --> configure full backup and initialize the snap (index) file
 # No  --> configure incremental backup # If today's backup exist --> Process aborted. Once a day is enough
 #
-##############################################################################
+# note: if not exist the snap file the full-backup will be forced
+#
+####################################################################################################
 f_full_inc ()
 {
-   for i in $v_month_full_bck 
-   do 
-      if [[ "$i" -eq "$v_numeric_month" ]] && [[ ! -f "$v_backup_full" ]]
-      then 
-         v_backup_file=$v_backup_full
-         v_log_file=$v_log_full
-         v_status_file=$v_status_full
-         break
-      elif [[ ! -f "$v_backup_inc" ]]
-      then
-         v_backup_file=$v_backup_inc
-         v_log_file=$v_log_inc
-         v_status_file=$v_status_inc
-      else
-         f_log "INFO: Backup file: $v_backup_inc . Exist. Process aborted"
-         pkill xmessage                 #Close the pop-up window to show at X-session that backup is finished
-         exit 2
-      fi
-   done
+   if [[ -f $v_snap_file ]]
+   then
+      for i in $v_month_full_bck 
+      do 
+         if [[ "$i" -eq "$v_numeric_month" ]] && [[ ! -f "$v_backup_full" ]]
+         then 
+            v_backup_file=$v_backup_full
+            v_log_file=$v_log_full
+            v_status_file=$v_status_full
+            cat /dev/null > $v_snap_file	#initialize the index file
+            break
+         elif [[ ! -f "$v_backup_inc" ]]
+         then
+            v_backup_file=$v_backup_inc
+            v_log_file=$v_log_inc
+            v_status_file=$v_status_inc
+         else
+            f_log "INFO: Backup file: $v_backup_inc . Exist. Process aborted"
+            pkill xmessage                 #Close the pop-up window to show at X-session that backup is finished
+            exit 2
+         fi
+      done
+   else	#if not exist the snap file the full-backup will be forced
+      f_log "WARNING: The snap file not exist, the full-backup will be forced"
+      v_backup_file=$v_backup_full
+      v_log_file=$v_log_full
+      v_status_file=$v_status_full
+      cat /dev/null > $v_snap_file
+   fi
    rm "$V_DONE"   #Deletes the last status (done) backup file
 }
 
-##############################################################################
+####################################################################################################
 #
 # Performs the backup as has been configured
 # Adds the file list to the month full log file
 # Create the incremental log file, with the today file list
 #
-##############################################################################
+####################################################################################################
 f_dobackup ()
 {
    f_log "---Source directory of the backup: $v_backup_source ---"
@@ -311,12 +324,12 @@ f_dobackup ()
    fi
 }
 
-##############################################################################
+####################################################################################################
 #
 # It obtains the days of each month from the beginning of the year until the 
 # current month and the sum of all
 #
-##############################################################################
+####################################################################################################
 f_month_days ()
 {
    v_sum_month_days=0 #starting value
@@ -333,7 +346,7 @@ f_month_days ()
    done
 }
 
-##############################################################################
+####################################################################################################
 #
 # Gets the difference of days between two dates
 # Calculates the time (in days) of the file, since the day 0000-01-01
@@ -342,7 +355,7 @@ f_month_days ()
 # 00000000011  
 # 12345678901
 #
-##############################################################################
+####################################################################################################
 f_difference ()
 {
    v_old_file_name=$(echo "$1" | awk 'BEGIN{FS="/"} {print $NF}')
@@ -371,7 +384,7 @@ f_difference ()
    v_difference=$(( $v_today_days - $v_old_file_days ))  #days of difference between the backup file's day and today 
 }
 
-##############################################################################
+####################################################################################################
 #
 # Delete the expired files. Files with persistence exceeded
 # Calculates the time (in days) of today, since the day 0000-01-01
@@ -379,7 +392,7 @@ f_difference ()
 # the backup files
 # If the difference is greather than the persistence, the file is expired
 #
-##############################################################################
+####################################################################################################
 f_delete_expired ()
 {
    f_month_days $v_numeric_month
@@ -394,11 +407,11 @@ f_delete_expired ()
    done
 }
 
-##############################################################################
+####################################################################################################
 #
 # Main
 #
-##############################################################################
+####################################################################################################
 xmessage "Backup is running. Please don't close this window. Minimize" &   #Open a pop-up window to show at X-session that backup is running
 f_target_exist
 f_source_exist
@@ -412,7 +425,7 @@ f_done_status
 f_delete_expired
 f_log "+++Ending   backup+++"
 pkill xmessage      #Close the pop-up window to show at X-session that backup is finished
-##############################################################################
+####################################################################################################
 ## TAR parameters
 #  -A, --catenate, --concatenate
 #     append tar files to an archive
