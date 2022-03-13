@@ -2,27 +2,26 @@ Name      : doBackup
 License   : The MIT License (MIT)
 Goal      : Makes directory backups, for example your home directory,
             compressed with tar.bz2
-Operation : At the configured months makes a full backup and the rest of the days makes an
-            incremental backup.
-            The scrip verifies if exist the full backup of this month and if this a month in which 
-            a full-backup must be made.
-            If there is but do not exist the full-backup, makes the full-backup, but if there is 
-            the full-backup, makes an incremental backup since the last.
-            Also create log files with a list of the content of backup files. You can 'grep' this 
-            logs for search files keeped in the backups.
-            Although you execute the script several blows at the same day, it only does one backup 
-            every day.
-            You can create a exclusion file where you can establish all the files that you will 
-            not want to copy.
-            You can config the persistence period of the backups. Backups beyond this period will 
-            be deleted.
+Operation : Usually it makes a incremental backup but you can configure the months of the
+            year in which a complete backup must be made.
+            Every month the script verifies if a a full-backup must be made. If so and not
+            exist yet, it do makes the full backup. If the full backup of the month already
+            exist, it performs an incremental backup since the last backup done.
+            Each backup also create a log file with a list of the content of the backup. 
+            You can use the 'grep' command to seek files keeped in the backups.
+            Although you execute the script several blows at the same day, it only does one
+            backup every day.
+            You can create a exclusion file where you can establish all the files that you
+            will not want to copy.
+            You can config the persistence period of the backups. Backups beyond this
+            period will be deleted.
 Requires  : 'doBackup_config' is a text file with 5 lines
             The fist line must contain the 'source backup folder'.
             Example: /home/user
             The second line must contain the 'target backup folder'.
             Example: /smb/bck/user
             The third line contains the 'exclusion file' (or a blank line), is optional. If you 
-            does not want use the 'exclusion file' you must leave a blank line
+            do not want use the 'exclusion file' you must leave a blank line
             The fourth line contains the 'persistence period' (or a blank line) expressed in days. 
             Is optional but if is a blank line, the default is: 120.
             The fifth line contains the number of months of the year, separated by blank, in which 
